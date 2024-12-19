@@ -1,39 +1,35 @@
+import asyncio
 import json
 from typing import Optional
 
-from fastapi import (
-    APIRouter,
-    Response,
-    UploadFile,
-    status,
-)
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from schema import CreateModel, UploadModel
 from tools.model_handler import ModelOperator
-from utils import ResponseErrorHandler, config_logger, manager
+from utils import ResponseErrorHandler, config_logger
 from utils.background_excutor import TaskExecutor
 
 router = APIRouter()
 
 
 MODEL_CONFIG = config_logger("model_api.log", "w", "info")
-task_executor = TaskExecutor(max_workers=5)
+task_executor = TaskExecutor(max_workers=10)
 
 
 @router.get("/model", tags=["Get models list"])
-async def get_models():
+async def get_models(
+    # stream: bool = Query(default=True, description="Enable streaming response"),
+):
     error_handler = ResponseErrorHandler()
     try:
-        operator = ModelOperator()
-        task_executor.run_in_background(operator.get_model_list, ws_sender=manager.send)
+        message = asyncio.Queue()
+        operator = ModelOperator(message=message)
+        task_executor.run_in_background(operator.get_model_list)
         MODEL_CONFIG.info(f"Start get model ({operator.uuid})")
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Start get model list.",
-                "uuid": operator.uuid,
-            },
+        # if stream:
+        return StreamingResponse(
+            content=operator.get_status(),
+            media_type="application/json",
         )
 
     except Exception as e:
@@ -58,24 +54,24 @@ async def upload(
     request_body = UploadModel(model=model)
     error_handler = ResponseErrorHandler()
     try:
-        operator = ModelOperator()
+        message = asyncio.Queue()
+        operator = ModelOperator(message=message)
         filename = request_body.model.filename
         file = await request_body.model.read()
 
         task_executor.run_in_background(
-            operator.save_model, filename=filename, file=file, ws_sender=manager.send
+            operator.save_model,
+            filename=filename,
+            file=file,
         )
         MODEL_CONFIG.info(
             f"Start upload model ({operator.uuid}): model : {filename.replace('.zip', '')}"
         )
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Start upload model.",
-                "uuid": operator.uuid,
-            },
+        return StreamingResponse(
+            content=operator.get_status(),
+            media_type="application/json",
         )
+
     except Exception as e:
         MODEL_CONFIG.error("Start upload model error {}".format(e))
         error_handler.add(
@@ -97,27 +93,23 @@ def create_model(
 ):
     error_handler = ResponseErrorHandler()
     try:
+        message = asyncio.Queue()
         model = request.model
 
         model_name_on_ollama = request.model_name_on_ollama
-        operator = ModelOperator()
+        operator = ModelOperator(message=message)
         task_executor.run_in_background(
             operator.create_model,
             model=model,
             model_name_on_ollama=model_name_on_ollama,
-            ws_sender=manager.send,
         )
 
         MODEL_CONFIG.info(
             f"Start create model ({operator.uuid}): model : {model} , model name on ollama : {model_name_on_ollama}"
         )
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "message": "Start create Model.",
-                "uuid": operator.uuid,
-            },
+        return StreamingResponse(
+            content=operator.get_status(),
+            media_type="application/json",
         )
 
     except Exception as e:

@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 from fastapi import UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -8,11 +7,7 @@ from tools.connect import get_models_folder
 from utils.error import ResponseErrorHandler
 
 
-class GetModelList(BaseModel):
-    total_nums: int
-    model_list: List[str]
-
-
+# For Create model
 class CreateModel(BaseModel):
     model: str
     model_name_on_ollama: str
@@ -44,6 +39,7 @@ class CreateModel(BaseModel):
         return self
 
 
+# For Upload model
 class UploadModel(BaseModel):
     model: UploadFile
 

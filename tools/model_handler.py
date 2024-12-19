@@ -1,12 +1,11 @@
+import asyncio
 import json
 import os
 from string import Template
-from typing import Callable
 
 import httpx
-from schema import GetModelList
 from tools.connect import get_model_server_url, get_models_folder
-from utils import config_logger, get_uuid, manager
+from utils import ResponseErrorHandler, config_logger, get_uuid, manager
 
 from .zip_handler import ZipOperator
 
@@ -14,86 +13,102 @@ MODEL_CONFIG = config_logger("model.log", "w", "info")
 
 
 class ModelOperator:
-    def __init__(self):
+    def __init__(self, message: asyncio.Queue):
         self.uuid = get_uuid()
         manager.create_room(self.uuid)
         self.root_path = get_models_folder()
+        self.message = message
+        self.alive = True
+        self.error_handler = ResponseErrorHandler()
 
-    async def get_model_list(self, ws_sender: Callable[str, dict]):
+    async def get_status(self):
+        while self.alive or not self.message.empty():
+            if not self.message.empty():
+                message = await self.message.get()
+                yield message
+            await asyncio.sleep(0.1)
+
+    async def get_model_list(self):
         try:
             total_model_dir = next(os.walk(self.root_path))[1]
-            content = GetModelList(
-                **dict(total_nums=len(total_model_dir), model_list=total_model_dir)
-            )
-            MODEL_CONFIG.info(f"Get model list : {content.model_dump()}")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "success",
-                    "message": content.model_dump(),
-                },
-            )
+
+            MODEL_CONFIG.info(f"Get model list : {total_model_dir}")
+
+            for model in total_model_dir:
+                await self.message.put(
+                    (
+                        json.dumps({"status": "success", "message": {"model": model}})
+                        + "\n"
+                    )
+                )
+                await asyncio.sleep(0.1)
 
         except Exception as e:
             MODEL_CONFIG.error(f"Failed Get model list. details: {e}")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "error",
-                    "message": "Model save error.",
-                    "details": str(e),
-                },
+            self.error_handler.add(
+                type=self.error_handler.ERR_INTERNAL,
+                loc=[self.error_handler.ERR_INTERNAL],
+                msg=str(f"Failed Get model list. details: {e}"),
+                input=dict(),
             )
+            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            await asyncio.sleep(0.1)
         finally:
-            await ws_sender(
-                uuid=self.uuid,
-                message={"end": True},
+            await asyncio.sleep(0.1)
+            self.alive = False
+            await self.message.put(
+                json.dumps({"status": "success", "message": {"end": True}})
             )
 
-    async def save_model(
-        self, filename: str, file: bytes, ws_sender: Callable[str, dict]
-    ):
+    async def save_model(self, filename: str, file: bytes):
         try:
             operator = ZipOperator(filename=filename)
             operator.save_zip(file=file)
             MODEL_CONFIG.info(f"Save '{filename}' success.")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "success",
-                    "message": "Model save successfully.",
-                },
+
+            await self.message.put(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "message": f"Save '{filename}' success.",
+                    }
+                )
+                + "\n"
             )
+
+            await asyncio.sleep(0.1)
 
             operator.extract()
             MODEL_CONFIG.info(f"Upload '{filename}' success.")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "success",
-                    "message": "Model extracted successfully.",
-                },
+            await self.message.put(
+                json.dumps(
+                    {
+                        "status": "success",
+                        "message": "Model extracted successfully.",
+                    }
+                )
+                + "\n"
             )
-
+            await asyncio.sleep(0.1)
         except Exception as e:
             MODEL_CONFIG.error(f"Failed save model. details: {e}")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "error",
-                    "message": "Model save error.",
-                    "details": str(e),
-                },
-            )
-        finally:
-            await ws_sender(
-                uuid=self.uuid,
-                message={"end": True},
+            self.error_handler.add(
+                type=self.error_handler.ERR_INTERNAL,
+                loc=[self.error_handler.ERR_INTERNAL],
+                msg=str(f"Failed save model. details: {e}"),
+                input=dict(),
             )
 
-    async def create_model(
-        self, model: str, model_name_on_ollama: str, ws_sender: Callable[str, dict]
-    ):
+            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            await asyncio.sleep(0.1)
+        finally:
+            await asyncio.sleep(0.1)
+            self.alive = False
+            await self.message.put(
+                json.dumps({"status": "success", "message": {"end": True}})
+            )
+
+    async def create_model(self, model: str, model_name_on_ollama: str):
         try:
             model_server_url = get_model_server_url()
             url = model_server_url + "api/create"
@@ -103,12 +118,17 @@ class ModelOperator:
             )  # Check if the model folder exists
 
             if not os.path.exists(model_folder):
-                await ws_sender(
-                    uuid=self.uuid,
-                    message={"status": "error", "message": "Model not exist."},
-                )
                 MODEL_CONFIG.warning(f"{model} not exist.")
-                raise FileExistsError(f"{model} not exist.")
+                self.error_handler.add(
+                    type=self.error_handler.ERR_INTERNAL,
+                    loc=[self.error_handler.ERR_INTERNAL],
+                    msg=str("Model not exist."),
+                    input=dict(),
+                )
+
+                await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                await asyncio.sleep(0.1)
+
             files = next(os.walk(model_folder))[2]
             modelfile_content = ""
             basemodel_template = Template("FROM $base_model_path")
@@ -147,49 +167,63 @@ class ModelOperator:
                                 try:
                                     # parsed_response = json.loads(line)
 
-                                    await ws_sender(
-                                        uuid=self.uuid,
-                                        message={
-                                            "status": "success",
-                                            "message": "Get model process status from ollama.",
-                                            "details": str(line),
-                                        },
+                                    await self.message.put(
+                                        json.dumps(
+                                            {
+                                                "status": "success",
+                                                "message": "Get model process status from ollama.",
+                                                "details": str(line),
+                                            }
+                                        )
+                                        + "\n"
                                     )
+
+                                    await asyncio.sleep(0.1)
                                     # print(parsed_response)
                                 except json.JSONDecodeError as e:
                                     MODEL_CONFIG.error(
                                         f"JSON decode error.details: {e}"
                                     )
-                                    await ws_sender(
-                                        uuid=self.uuid,
-                                        message={
-                                            "status": "error",
-                                            "message": "JSON decode error",
-                                            "details": f"{e}, line: {line}",
-                                        },
+
+                                    self.error_handler.add(
+                                        type=self.error_handler.ERR_INTERNAL,
+                                        loc=[self.error_handler.ERR_INTERNAL],
+                                        msg=str(f"JSON decode error.details: {e}"),
+                                        input=dict(),
                                     )
+
+                                    await self.message.put(
+                                        json.dumps(self.error_handler.errors) + "\n"
+                                    )
+                                    await asyncio.sleep(0.1)
                 except httpx.RequestError as e:
                     MODEL_CONFIG.error(f"Request error.details: {e}")
-                    await ws_sender(
-                        uuid=self.uuid,
-                        message={
-                            "status": "error",
-                            "message": "Request error",
-                            "details": str(e),
-                        },
+
+                    self.error_handler.add(
+                        type=self.error_handler.ERR_INTERNAL,
+                        loc=[self.error_handler.ERR_INTERNAL],
+                        msg=str(f"Request error.details: {e}"),
+                        input=dict(),
                     )
+
+                    await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                    await asyncio.sleep(0.1)
+
         except Exception as e:
             MODEL_CONFIG.error(f"Unexpected failed to create model..details: {e}")
-            await ws_sender(
-                uuid=self.uuid,
-                message={
-                    "status": "error",
-                    "message": "Unexpected failed to create model.",
-                    "details": str(e),
-                },
+
+            self.error_handler.add(
+                type=self.error_handler.ERR_INTERNAL,
+                loc=[self.error_handler.ERR_INTERNAL],
+                msg=str(f"Unexpected failed to create model..details: {e}"),
+                input=dict(),
             )
+
+            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            await asyncio.sleep(0.1)
         finally:
-            await ws_sender(
-                uuid=self.uuid,
-                message={"end": True},
+            await asyncio.sleep(0.1)
+            self.alive = False
+            await self.message.put(
+                json.dumps({"status": "success", "message": {"end": True}})
             )
