@@ -25,7 +25,6 @@ class ModelOperator:
         self.message = asyncio.Queue()
         self.alive = True
         self.model_status = MODEL_STATUS
-        self.model_status["ss"] = 12
         self.error_handler = ResponseErrorHandler()
 
     async def delete_model(self, model: str):
