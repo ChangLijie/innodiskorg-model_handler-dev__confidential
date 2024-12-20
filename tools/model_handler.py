@@ -114,7 +114,7 @@ class ModelOperator:
     async def save_model(self, model: str, file: bytes):
         try:
             self.model_status[model] = self.uuid
-            operator = ZipOperator(model=model)
+            operator = ZipOperator(filename=model)
             operator.save_zip(file=file)
             logging.info(f"'{self.uuid}' Save '{model}' success.")
 

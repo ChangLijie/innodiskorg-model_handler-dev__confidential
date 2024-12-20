@@ -22,7 +22,6 @@ async def get_models(
     error_handler = ResponseErrorHandler()
     try:
         operator = ModelOperator()
-        print(MODEL_STATUS)
         task_executor.run_in_background(task=operator.get_model_list)
         TASK_LOG.info(f"Start get model ({operator.uuid})")
 
@@ -59,7 +58,7 @@ async def upload(
 
         task_executor.run_in_background(
             operator.save_model,
-            filename=filename,
+            model=filename,
             file=file,
         )
 
