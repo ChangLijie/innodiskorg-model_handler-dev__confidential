@@ -7,6 +7,38 @@ from tools.connect import get_models_folder
 from utils.error import ResponseErrorHandler
 
 
+# For Delete model
+class DeleteModel(BaseModel):
+    model: str
+
+    @model_validator(mode="after")
+    def check_file(self: "DeleteModel") -> "DeleteModel":
+        error_handler = ResponseErrorHandler()
+
+        if not self.model or not isinstance(self.model, str):
+            error_handler.add(
+                type=error_handler.ERR_VALIDATE,
+                loc=[error_handler.LOC_BODY],
+                msg="Model name is invalid or missing.",
+                input={},
+            )
+
+            raise RequestValidationError(error_handler.errors)
+
+        root_path = get_models_folder()
+        model_path = os.path.join(root_path, self.model)
+        if not os.path.isdir(model_path):
+            error_handler.add(
+                type=error_handler.ERR_VALIDATE,
+                loc=[error_handler.LOC_BODY],
+                msg="Model not exist.",
+                input={},
+            )
+            raise RequestValidationError(error_handler.errors)
+
+        return self
+
+
 # For Create model
 class CreateModel(BaseModel):
     model: str

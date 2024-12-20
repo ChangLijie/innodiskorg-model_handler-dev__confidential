@@ -1,18 +1,17 @@
-import asyncio
 import json
 from typing import Optional
 
 from fastapi import APIRouter, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
-from schema import CreateModel, UploadModel
-from tools.model_handler import ModelOperator
+from schema import CreateModel, DeleteModel, UploadModel
+from tools.model_handler import MODEL_STATUS, ModelOperator
 from utils import ResponseErrorHandler, config_logger
 from utils.background_excutor import TaskExecutor
 
 router = APIRouter()
 
 
-MODEL_CONFIG = config_logger("model_api.log", "w", "info")
+TASK_LOG = config_logger("system.log", "w", "info")
 task_executor = TaskExecutor(max_workers=10)
 
 
@@ -22,22 +21,22 @@ async def get_models(
 ):
     error_handler = ResponseErrorHandler()
     try:
-        message = asyncio.Queue()
-        operator = ModelOperator(message=message)
-        task_executor.run_in_background(operator.get_model_list)
-        MODEL_CONFIG.info(f"Start get model ({operator.uuid})")
-        # if stream:
+        operator = ModelOperator()
+        print(MODEL_STATUS)
+        task_executor.run_in_background(task=operator.get_model_list)
+        TASK_LOG.info(f"Start get model ({operator.uuid})")
+
         return StreamingResponse(
             content=operator.get_status(),
             media_type="application/json",
         )
 
     except Exception as e:
-        MODEL_CONFIG.error("Start get model list error {}".format(e))
+        TASK_LOG.error(f"'{operator.uuid}'Get model list error. Details : {e}")
         error_handler.add(
             type=error_handler.ERR_UNEXPECTED,
             loc=[error_handler.LOC_UNEXPECTED],
-            msg=str(e),
+            msg=f"'{operator.uuid}'Get model list error. Details : {e}",
             input=dict(),
         )
         return Response(
@@ -54,8 +53,7 @@ async def upload(
     request_body = UploadModel(model=model)
     error_handler = ResponseErrorHandler()
     try:
-        message = asyncio.Queue()
-        operator = ModelOperator(message=message)
+        operator = ModelOperator()
         filename = request_body.model.filename
         file = await request_body.model.read()
 
@@ -64,7 +62,8 @@ async def upload(
             filename=filename,
             file=file,
         )
-        MODEL_CONFIG.info(
+
+        TASK_LOG.info(
             f"Start upload model ({operator.uuid}): model : {filename.replace('.zip', '')}"
         )
         return StreamingResponse(
@@ -73,11 +72,61 @@ async def upload(
         )
 
     except Exception as e:
-        MODEL_CONFIG.error("Start upload model error {}".format(e))
+        TASK_LOG.error(f"'{operator.uuid}' Upload model error. Details :{e}")
         error_handler.add(
             type=error_handler.ERR_UNEXPECTED,
             loc=[error_handler.LOC_UNEXPECTED],
-            msg=str(e),
+            msg=f"'{operator.uuid}' Upload model error. Details :{e}",
+            input=dict(),
+        )
+        return Response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=json.dumps(error_handler.errors),
+            media_type="application/json",
+        )
+
+
+@router.delete("/model", tags=["Delete Innodisk Model."])
+def delete_model(
+    request: DeleteModel,
+):
+    error_handler = ResponseErrorHandler()
+    try:
+        model = request.model
+        operator = ModelOperator()
+        if model in MODEL_STATUS:
+            error_handler.add(
+                type=error_handler.ERR_INTERNAL,
+                loc=[error_handler.ERR_INTERNAL],
+                msg=f"Model '{model}' is currently in use and cannot be deleted.",
+                input={},
+            )
+            TASK_LOG.info(
+                f"Failed Delete model ({operator.uuid}): model : {model} is currently in use and cannot be deleted."
+            )
+            return Response(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content=json.dumps(error_handler.errors),
+                media_type="application/json",
+            )
+
+        task_executor.run_in_background(
+            operator.delete_model,
+            model=model,
+        )
+
+        TASK_LOG.info(f"Start Delete model ({operator.uuid}): model : {model}.")
+        return StreamingResponse(
+            content=operator.get_status(),
+            media_type="application/json",
+        )
+
+    except Exception as e:
+        TASK_LOG.error(f"'{operator.uuid}' Delete model error. Details : {e}")
+        error_handler.add(
+            type=error_handler.ERR_UNEXPECTED,
+            loc=[error_handler.LOC_UNEXPECTED],
+            msg=f"'{operator.uuid}' Delete model error. Details : {e}",
             input=dict(),
         )
         return Response(
@@ -93,18 +142,17 @@ def create_model(
 ):
     error_handler = ResponseErrorHandler()
     try:
-        message = asyncio.Queue()
         model = request.model
 
         model_name_on_ollama = request.model_name_on_ollama
-        operator = ModelOperator(message=message)
+        operator = ModelOperator()
         task_executor.run_in_background(
             operator.create_model,
             model=model,
             model_name_on_ollama=model_name_on_ollama,
         )
 
-        MODEL_CONFIG.info(
+        TASK_LOG.info(
             f"Start create model ({operator.uuid}): model : {model} , model name on ollama : {model_name_on_ollama}"
         )
         return StreamingResponse(
@@ -113,11 +161,11 @@ def create_model(
         )
 
     except Exception as e:
-        MODEL_CONFIG.error("Start create model error {}".format(e))
+        TASK_LOG.error(f"'{operator.uuid}' Create model error. Details : {e}")
         error_handler.add(
             type=error_handler.ERR_UNEXPECTED,
             loc=[error_handler.LOC_UNEXPECTED],
-            msg=str(e),
+            msg=f"'{operator.uuid}' Create model error. Details : {e}",
             input=dict(),
         )
         return Response(

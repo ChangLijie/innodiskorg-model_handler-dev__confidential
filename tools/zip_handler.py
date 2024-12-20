@@ -20,6 +20,7 @@ class ZipOperator:
         try:
             with open(self.zip_path, "wb") as buffer:
                 buffer.write(file)
+
         except Exception as e:
             self.error_handler.add(
                 type=self.error_handler.ERR_UNEXPECTED,

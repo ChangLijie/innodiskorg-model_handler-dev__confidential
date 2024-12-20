@@ -2,11 +2,12 @@ from fastapi import (
     FastAPI,
 )
 from fastapi.responses import JSONResponse
-from routers import model_router, ws_router
+from routers import model_router
 
 app = FastAPI()
+
 app.include_router(model_router.router)
-app.include_router(ws_router.router)
+# app.include_router(ws_router.router)
 
 
 @app.get("/", tags=["Test model handler alive"])

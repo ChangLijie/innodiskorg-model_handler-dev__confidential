@@ -1,1 +1,1 @@
-from .main import CreateModel, UploadModel
+from .main import CreateModel, DeleteModel, UploadModel
