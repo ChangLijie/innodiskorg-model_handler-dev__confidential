@@ -30,8 +30,12 @@ async def get_models(
         task_executor.run_in_background(task=operator.get_model_list)
         TASK_LOG.info(f"Start get model ({operator.uuid})")
 
+        async def event_generator():
+            async for status_code, message in operator.get_status():
+                yield json.dumps({"status": status_code, "message": message}) + "\n"
+
         return StreamingResponse(
-            content=operator.get_status(),
+            content=event_generator(),
             media_type="application/json",
         )
 
@@ -70,8 +74,13 @@ async def upload(
         TASK_LOG.info(
             f"Start upload model ({operator.uuid}): model : {filename.replace('.zip', '')}"
         )
+
+        async def event_generator():
+            async for status_code, message in operator.get_status():
+                yield json.dumps({"status": status_code, "message": message}) + "\n"
+
         return StreamingResponse(
-            content=operator.get_status(),
+            content=event_generator(),
             media_type="application/json",
         )
 
@@ -120,8 +129,13 @@ def delete_model(
         )
 
         TASK_LOG.info(f"Start Delete model ({operator.uuid}): model : {model}.")
+
+        async def event_generator():
+            async for status_code, message in operator.get_status():
+                yield json.dumps({"status": status_code, "message": message}) + "\n"
+
         return StreamingResponse(
-            content=operator.get_status(),
+            content=event_generator(),
             media_type="application/json",
         )
 
@@ -159,8 +173,13 @@ def create_model(
         TASK_LOG.info(
             f"Start create model ({operator.uuid}): model : {model} , model name on ollama : {model_name_on_ollama}"
         )
+
+        async def event_generator():
+            async for status_code, message in operator.get_status():
+                yield json.dumps({"status": status_code, "message": message}) + "\n"
+
         return StreamingResponse(
-            content=operator.get_status(),
+            content=event_generator(),
             media_type="application/json",
         )
 

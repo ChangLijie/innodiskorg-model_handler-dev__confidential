@@ -38,7 +38,7 @@ class ModelOperator:
             await self.message.put(
                 (
                     json.dumps(
-                        {"status": "success", "message": f"Start Delete Model {model}"}
+                        {"status": 200, "message": f"Start Delete Model {model}"}
                     )
                     + "\n"
                 )
@@ -48,7 +48,7 @@ class ModelOperator:
                 (
                     json.dumps(
                         {
-                            "status": "success",
+                            "status": 200,
                             "message": f"Delete Model {model} success.",
                         }
                     )
@@ -65,21 +65,41 @@ class ModelOperator:
                 msg=str(f"'{self.uuid}' Failed Delete model list. Details: {e}"),
                 input=dict(),
             )
-            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            error = {
+                "status": 500,
+                "message": json.dumps(self.error_handler.errors) + "\n",
+            }
+            await self.message.put(error)
             await asyncio.sleep(0.1)
         finally:
             await asyncio.sleep(0.1)
             del self.model_status[model]
             self.alive = False
             await self.message.put(
-                json.dumps({"status": "success", "message": {"end": True}})
+                json.dumps({"status": 200, "message": {"end": True}})
             )
 
     async def get_status(self):
         while self.alive or not self.message.empty():
             if not self.message.empty():
-                message = await self.message.get()
-                yield message
+                raw_message = await self.message.get()
+                try:
+                    # 檢查 raw_message 的類型，避免多次解析
+                    if isinstance(raw_message, str):
+                        message = json.loads(raw_message)
+                    elif isinstance(raw_message, dict):
+                        message = raw_message
+                    else:
+                        raise TypeError(
+                            f"Unsupported message type: {type(raw_message)}"
+                        )
+
+                    yield message["status"], message["message"]
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
+                    self.log.error(
+                        f"Failed to process message: {raw_message}, Error: {e}"
+                    )
+                    yield 500, {"error": "Invalid message format"}
             await asyncio.sleep(0.1)
 
     async def get_model_list(self):
@@ -90,10 +110,7 @@ class ModelOperator:
 
             for model in total_model_dir:
                 await self.message.put(
-                    (
-                        json.dumps({"status": "success", "message": {"model": model}})
-                        + "\n"
-                    )
+                    (json.dumps({"status": 200, "message": {"model": model}}) + "\n")
                 )
                 await asyncio.sleep(0.1)
 
@@ -105,13 +122,17 @@ class ModelOperator:
                 msg=str(f"'{self.uuid}' Failed Get model list. Details: {e}"),
                 input=dict(),
             )
-            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            error = {
+                "status": 500,
+                "message": json.dumps(self.error_handler.errors) + "\n",
+            }
+            await self.message.put(error)
             await asyncio.sleep(0.1)
         finally:
             await asyncio.sleep(0.1)
             self.alive = False
             await self.message.put(
-                json.dumps({"status": "success", "message": {"end": True}})
+                json.dumps({"status": 200, "message": {"end": True}})
             )
 
     async def save_model(self, model: str, file: bytes):
@@ -124,7 +145,7 @@ class ModelOperator:
             await self.message.put(
                 json.dumps(
                     {
-                        "status": "success",
+                        "status": 200,
                         "message": f"Save '{model}' success.",
                     }
                 )
@@ -138,7 +159,7 @@ class ModelOperator:
             await self.message.put(
                 json.dumps(
                     {
-                        "status": "success",
+                        "status": 200,
                         "message": "Model extracted successfully.",
                     }
                 )
@@ -154,14 +175,18 @@ class ModelOperator:
                 input=dict(),
             )
 
-            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            error = {
+                "status": 500,
+                "message": json.dumps(self.error_handler.errors) + "\n",
+            }
+            await self.message.put(error)
             await asyncio.sleep(0.1)
         finally:
             await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
             await self.message.put(
-                json.dumps({"status": "success", "message": {"end": True}})
+                json.dumps({"status": 200, "message": {"end": True}})
             )
 
     async def create_model(self, model: str, model_name_on_ollama: str):
@@ -185,7 +210,11 @@ class ModelOperator:
                     input=dict(),
                 )
 
-                await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                error = {
+                    "status": 500,
+                    "message": json.dumps(self.error_handler.errors) + "\n",
+                }
+                await self.message.put(error)
                 await asyncio.sleep(0.1)
 
             files = next(os.walk(model_folder))[2]
@@ -217,14 +246,17 @@ class ModelOperator:
                     msg=f"'{self.uuid}' Create model error. Details : File nums in {model} folder is illegal.",
                     input=dict(),
                 )
-                await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                error = {
+                    "status": 500,
+                    "message": json.dumps(self.error_handler.errors) + "\n",
+                }
+                await self.message.put(error)
                 await asyncio.sleep(0.1)
             # Prepare payload
             payload = {
                 "model": model_name_on_ollama,
                 "modelfile": modelfile_content,
             }
-            print(payload)
             self.log.debug(
                 f"'{self.uuid}' Start created model to ollama. payload: {payload}"
             )
@@ -240,7 +272,7 @@ class ModelOperator:
                                     await self.message.put(
                                         json.dumps(
                                             {
-                                                "status": "success",
+                                                "status": 200,
                                                 "message": "Get model process status from ollama.",
                                                 "details": str(line),
                                             }
@@ -264,9 +296,12 @@ class ModelOperator:
                                         input=dict(),
                                     )
 
-                                    await self.message.put(
-                                        json.dumps(self.error_handler.errors) + "\n"
-                                    )
+                                    error = {
+                                        "status": 400,
+                                        "message": json.dumps(self.error_handler.errors)
+                                        + "\n",
+                                    }
+                                    await self.message.put(error)
                                     await asyncio.sleep(0.1)
                 except httpx.RequestError as e:
                     self.log.error(
@@ -280,7 +315,11 @@ class ModelOperator:
                         input=dict(),
                     )
 
-                    await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                    error = {
+                        "status": 400,
+                        "message": json.dumps(self.error_handler.errors) + "\n",
+                    }
+                    await self.message.put(error)
                     await asyncio.sleep(0.1)
 
         except Exception as e:
@@ -297,12 +336,16 @@ class ModelOperator:
                 input=dict(),
             )
 
-            await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+            error = {
+                "status": 500,
+                "message": json.dumps(self.error_handler.errors) + "\n",
+            }
+            await self.message.put(error)
             await asyncio.sleep(0.1)
         finally:
             await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
             await self.message.put(
-                json.dumps({"status": "success", "message": {"end": True}})
+                json.dumps({"status": 200, "message": {"end": True}})
             )
