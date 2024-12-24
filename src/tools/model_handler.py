@@ -1,18 +1,14 @@
 import asyncio
 import json
-import logging
 import os
 import shutil
 from string import Template
 
 import httpx
 from tools.connect import get_model_server_url, get_models_folder
-from utils import ResponseErrorHandler, get_uuid
+from utils import ResponseErrorHandler, config_logger, get_uuid
 
 from .zip_handler import ZipOperator
-
-# logging = config_logger("model.log", "w", "info")
-
 
 MODEL_STATUS = {}
 
@@ -26,11 +22,18 @@ class ModelOperator:
         self.alive = True
         self.model_status = MODEL_STATUS
         self.error_handler = ResponseErrorHandler()
+        self.log = config_logger(
+            file_name=f"{self.uuid}.log",
+            write_mode="w",
+            level="debug",
+            logger_name=f"{self.uuid}_logger",
+            sub_folder="tasks",
+        )
 
     async def delete_model(self, model: str):
         try:
             self.model_status[model] = self.uuid
-            logging.info(f"'{self.uuid}'Delete model.Details : {model}")
+            self.log.info(f"'{self.uuid}'Delete model.Details : {model}")
             model_path = os.path.join(self.root_path, model)
             await self.message.put(
                 (
@@ -52,10 +55,10 @@ class ModelOperator:
                     + "\n"
                 )
             )
-            logging.warning(f"'{self.uuid}'Delete model success.Details : {model}.")
+            self.log.warning(f"'{self.uuid}'Delete model success.Details : {model}.")
 
         except Exception as e:
-            logging.error(f"'{self.uuid}' Failed Delete model list. Details: {e}")
+            self.log.error(f"'{self.uuid}' Failed Delete model list. Details: {e}")
             self.error_handler.add(
                 type=self.error_handler.ERR_INTERNAL,
                 loc=[self.error_handler.ERR_INTERNAL],
@@ -83,7 +86,7 @@ class ModelOperator:
         try:
             total_model_dir = next(os.walk(self.root_path))[1]
 
-            logging.info(f"'{self.uuid}'Get model list. Detail:{total_model_dir}")
+            self.log.info(f"'{self.uuid}'Get model list. Detail:{total_model_dir}")
 
             for model in total_model_dir:
                 await self.message.put(
@@ -95,7 +98,7 @@ class ModelOperator:
                 await asyncio.sleep(0.1)
 
         except Exception as e:
-            logging.error(f"'{self.uuid}' Failed Get model list. Details: {e}")
+            self.log.error(f"'{self.uuid}' Failed Get model list. Details: {e}")
             self.error_handler.add(
                 type=self.error_handler.ERR_INTERNAL,
                 loc=[self.error_handler.ERR_INTERNAL],
@@ -116,7 +119,7 @@ class ModelOperator:
             self.model_status[model] = self.uuid
             operator = ZipOperator(filename=model)
             operator.save_zip(file=file)
-            logging.info(f"'{self.uuid}' Save '{model}' success.")
+            self.log.info(f"'{self.uuid}' Save '{model}' success.")
 
             await self.message.put(
                 json.dumps(
@@ -131,7 +134,7 @@ class ModelOperator:
             await asyncio.sleep(0.1)
 
             operator.extract()
-            logging.info(f"'{self.uuid}' Upload '{model}' success.")
+            self.log.info(f"'{self.uuid}' Upload '{model}' success.")
             await self.message.put(
                 json.dumps(
                     {
@@ -143,7 +146,7 @@ class ModelOperator:
             )
             await asyncio.sleep(0.1)
         except Exception as e:
-            logging.error(f"'{self.uuid}' Failed save model. Details: {e}")
+            self.log.error(f"'{self.uuid}' Failed save model. Details: {e}")
             self.error_handler.add(
                 type=self.error_handler.ERR_INTERNAL,
                 loc=[self.error_handler.ERR_INTERNAL],
@@ -172,7 +175,7 @@ class ModelOperator:
             )  # Check if the model folder exists
 
             if not os.path.exists(model_folder):
-                logging.warning(
+                self.log.warning(
                     f"'{self.uuid}' Create model error. Details : {model} not exist."
                 )
                 self.error_handler.add(
@@ -213,7 +216,8 @@ class ModelOperator:
                 "model": model_name_on_ollama,
                 "modelfile": modelfile_content,
             }
-            logging.debug(
+            print(payload)
+            self.log.debug(
                 f"'{self.uuid}' Start created model to ollama. payload: {payload}"
             )
             # Make the POST request
@@ -239,7 +243,7 @@ class ModelOperator:
                                     await asyncio.sleep(0.1)
                                     # print(parsed_response)
                                 except json.JSONDecodeError as e:
-                                    logging.error(
+                                    self.log.error(
                                         f"'{self.uuid}' Create model Get response error .Details: JSON decode error . {e}"
                                     )
 
@@ -257,7 +261,7 @@ class ModelOperator:
                                     )
                                     await asyncio.sleep(0.1)
                 except httpx.RequestError as e:
-                    logging.error(
+                    self.log.error(
                         f"'{self.uuid}' Create model Request error.details: {e}"
                     )
 
@@ -272,7 +276,7 @@ class ModelOperator:
                     await asyncio.sleep(0.1)
 
         except Exception as e:
-            logging.error(
+            self.log.error(
                 f"'{self.uuid}' Unexpected failed to create model. Details: {e}"
             )
 

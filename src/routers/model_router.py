@@ -11,7 +11,12 @@ from utils.background_excutor import TaskExecutor
 router = APIRouter()
 
 
-TASK_LOG = config_logger("system.log", "w", "info")
+TASK_LOG = config_logger(
+    file_name="system.log",
+    write_mode="w",
+    level="info",
+    logger_name="model_router_logger",
+)
 task_executor = TaskExecutor(max_workers=10)
 
 
