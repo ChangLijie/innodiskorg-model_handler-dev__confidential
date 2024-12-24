@@ -194,7 +194,7 @@ class ModelOperator:
             gguf_template = Template("\nADAPTER $gguf_path")
 
             # Prepare the modelfile content
-            if len(files) == 0:
+            if len(files) == 2:
                 if "lora" in files[0]:
                     base_model_path = os.path.join(ollama_model_folder, files[1])
                     gguf_path = os.path.join(ollama_model_folder, files[0])
@@ -205,12 +205,20 @@ class ModelOperator:
                 modelfile_content = basemodel_template.substitute(
                     base_model_path=base_model_path
                 ) + gguf_template.substitute(gguf_path=gguf_path)
-            else:
+            elif len(files) == 1:
                 base_model_path = os.path.join(ollama_model_folder, files[0])
                 modelfile_content = basemodel_template.substitute(
                     base_model_path=base_model_path
                 )
-
+            else:
+                self.error_handler.add(
+                    type=self.error_handler.ERR_INTERNAL,
+                    loc=[self.error_handler.ERR_INTERNAL],
+                    msg=f"'{self.uuid}' Create model error. Details : File nums in {model} folder is illegal.",
+                    input=dict(),
+                )
+                await self.message.put(json.dumps(self.error_handler.errors) + "\n")
+                await asyncio.sleep(0.1)
             # Prepare payload
             payload = {
                 "model": model_name_on_ollama,
