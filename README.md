@@ -1,18 +1,18 @@
 # Model Handler
 
-Model Handler is a project designed to provide an interface for uploading custom model files and deploying them to the Ollama Model Server.
+Model Handler is a project designed to provide an interface for uploading custom model files **(Note: Custom models must be in GGUF format.)** and deploying them to the Ollama Model Server.
 
 ## Purpose
 
 The primary goal of Model Handler is to create an efficient workflow for managing models by:
 
-* Providing an API to upload custom model files.
+* Providing an API to upload custom model files.**(Note: Custom models must be in GGUF format.)**
 
 * Deploying uploaded models to Ollama.
 
 ## Features
 
-* Upload Models: Upload custom model files to the server.
+* Upload Models: Upload custom model files to the server.**(Note: Custom model must be in GGUF format.)**
 
 * Deploy to Ollama: Deploy the uploaded models to the Ollama Model Server for use.
 
