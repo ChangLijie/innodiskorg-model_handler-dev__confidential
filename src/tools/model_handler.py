@@ -273,7 +273,7 @@ class ModelOperator:
                                         json.dumps(
                                             {
                                                 "status": 200,
-                                                "message": "Get model process status from ollama.",
+                                                "message": f"Get model process status from ollama. details : {str(line)}",
                                                 "details": str(line),
                                             }
                                         )
