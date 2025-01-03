@@ -267,13 +267,13 @@ class ModelOperator:
                         async for line in response.aiter_lines():
                             if line.strip():
                                 try:
-                                    # parsed_response = json.loads(line)
-
+                                    parsed_response = json.loads(line)
+                                    # {"status":"using existing layer sha256:9845de86d85acee501671b2fa12bfb8c98adc36c82897eed479fbfb81ea6bedf"}
                                     await self.message.put(
                                         json.dumps(
                                             {
                                                 "status": 200,
-                                                "message": f"Get model process status from ollama. details : {str(line)}",
+                                                "message": f"Get model process status from ollama. status : {str(parsed_response['status'])}",
                                                 "details": str(line),
                                             }
                                         )
