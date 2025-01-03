@@ -1,11 +1,18 @@
 from fastapi import (
     FastAPI,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from routers import model_router
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(model_router.router)
 # app.include_router(ws_router.router)
 
