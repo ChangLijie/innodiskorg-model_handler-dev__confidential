@@ -1,7 +1,7 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from schema import CreateModel, DeleteModel, UploadModel
 from tools.model_handler import MODEL_STATUS, ModelOperator
@@ -101,7 +101,7 @@ async def upload(
 
 @router.delete("/model", tags=["Delete Innodisk Model."])
 def delete_model(
-    request: DeleteModel,
+    request: DeleteModel = Depends(),
 ):
     error_handler = ResponseErrorHandler()
     try:
