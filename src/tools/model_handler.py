@@ -75,9 +75,9 @@ class ModelOperator:
             await asyncio.sleep(0.1)
             del self.model_status[model]
             self.alive = False
-            await self.message.put(
-                json.dumps({"status": 200, "message": {"end": True}})
-            )
+            # await self.message.put(
+            #     json.dumps({"status": 200, "message": {"end": True}})
+            # )
 
     async def get_status(self):
         while self.alive or not self.message.empty():
@@ -131,9 +131,9 @@ class ModelOperator:
         finally:
             await asyncio.sleep(0.1)
             self.alive = False
-            await self.message.put(
-                json.dumps({"status": 200, "message": {"end": True}})
-            )
+            # await self.message.put(
+            #     json.dumps({"status": 200, "message": {"end": True}})
+            # )
 
     async def save_model(self, model: str, file: bytes):
         try:
@@ -185,9 +185,9 @@ class ModelOperator:
             await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
-            await self.message.put(
-                json.dumps({"status": 200, "message": {"end": True}})
-            )
+            # await self.message.put(
+            #     json.dumps({"status": 200, "message": {"end": True}})
+            # )
 
     async def create_model(self, model: str, model_name_on_ollama: str):
         try:
@@ -346,6 +346,6 @@ class ModelOperator:
             await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
-            await self.message.put(
-                json.dumps({"status": 200, "message": {"end": True}})
-            )
+            # await self.message.put(
+            #     json.dumps({"status": 200, "message": {"end": True}})
+            # )
