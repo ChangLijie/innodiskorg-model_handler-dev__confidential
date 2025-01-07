@@ -3,6 +3,11 @@ import os
 import httpx
 
 
+def get_port():
+    # Get models port from ENV parameter.
+    return os.environ.get("MODEL_HANDLER_PORT", "5000")
+
+
 def get_models_folder():
     # Get models folder from ENV parameter.
     dir_path = os.environ.get("UPLOAD_DIR", "/workspace/models/inno")
