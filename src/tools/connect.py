@@ -5,7 +5,7 @@ import httpx
 
 def get_port():
     # Get models port from ENV parameter.
-    port = os.environ.get("MODEL_HANDLER_PORT", "5000")
+    port = int(os.environ.get("MODEL_HANDLER_PORT", "5000"))
     return port
 
 
