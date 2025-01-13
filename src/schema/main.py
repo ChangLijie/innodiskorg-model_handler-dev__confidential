@@ -1,10 +1,31 @@
 import os
+from typing import Dict
 
 from fastapi import UploadFile
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from tools.connect import get_models_folder
 from utils.error import ResponseErrorHandler
+
+
+class ResponseMessage(BaseModel):
+    action: str = Field(..., description="The action being reported.")
+    progress_ratio: float = Field(
+        ..., description="The progress ratio as a float (e.g., 0.0 to 1.0)."
+    )
+    details: Dict = Field(..., description="Additional details about the response.")
+
+
+class ResponseFormat(BaseModel):
+    status: int = Field(..., description="The status code of the response.")
+    message: ResponseMessage = Field(
+        ..., description="The message object containing action, progress, and details."
+    )
+
+    @field_validator("message", mode="after")
+    def convert_message_to_json(cls, value):
+        value = dict(value)
+        return value
 
 
 # For Delete model
