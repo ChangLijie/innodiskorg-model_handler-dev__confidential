@@ -10,6 +10,7 @@ from utils.error import ResponseErrorHandler
 
 class ResponseMessage(BaseModel):
     action: str = Field(..., description="The action being reported.")
+    task_uuid: str = Field(..., description="The action uuid.")
     progress_ratio: float = Field(
         ..., description="The progress ratio as a float (e.g., 0.0 to 1.0)."
     )

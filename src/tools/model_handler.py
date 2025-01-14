@@ -40,6 +40,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Start delete model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.5,
                     details={"model_name": model},
                 ),
@@ -52,6 +53,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Success delete model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=1,
                     details={"model_name": model},
                 ),
@@ -74,6 +76,7 @@ class ModelOperator:
                 status=500,
                 message=ResponseMessage(
                     action="Failed delete model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=-1,
                     details=dict(self.error_handler.errors),
                 ),
@@ -118,6 +121,7 @@ class ModelOperator:
                     status=200,
                     message=ResponseMessage(
                         action="Get model.",
+                        task_uuid=str(self.uuid),
                         progress_ratio=(progress + 1) / total_model,
                         details={"model": model},
                     ),
@@ -138,6 +142,7 @@ class ModelOperator:
                 status=500,
                 message=ResponseMessage(
                     action="Failed to get model list.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=-1,
                     details=dict(self.error_handler.errors),
                 ),
@@ -158,6 +163,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Started save model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.25,
                     details={"model": model},
                 ),
@@ -169,6 +175,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Start extracted model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.5,
                     details={"model": model},
                 ),
@@ -183,6 +190,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Success upload model file.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=1,
                     details={"model": model},
                 ),
@@ -202,6 +210,7 @@ class ModelOperator:
                 status=500,
                 message=ResponseMessage(
                     action="Failed to upload model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=-1,
                     details=dict(self.error_handler.errors),
                 ),
@@ -226,6 +235,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Started to create model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.1,
                     details={"model": model},
                 ),
@@ -247,6 +257,7 @@ class ModelOperator:
                     status=500,
                     message=ResponseMessage(
                         action="Create model error.",
+                        task_uuid=str(self.uuid),
                         progress_ratio=-1,
                         details=dict(self.error_handler.errors),
                     ),
@@ -258,6 +269,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Start structure template",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.2,
                     details={"model": model},
                 ),
@@ -299,6 +311,7 @@ class ModelOperator:
                     status=500,
                     message=ResponseMessage(
                         action="Failed to structure template",
+                        task_uuid=str(self.uuid),
                         progress_ratio=-1,
                         details=dict(self.error_handler.errors),
                     ),
@@ -318,6 +331,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Start to call model server",
+                    task_uuid=str(self.uuid),
                     progress_ratio=0.5,
                     details={
                         "model": model,
@@ -370,6 +384,7 @@ class ModelOperator:
                                         status=400,
                                         message=ResponseMessage(
                                             action="Model server processing failed.",
+                                            task_uuid=str(self.uuid),
                                             progress_ratio=-1,
                                             details=dict(self.error_handler.errors),
                                         ),
@@ -394,6 +409,7 @@ class ModelOperator:
                         status=400,
                         message=ResponseMessage(
                             action="Failed to call model server",
+                            task_uuid=str(self.uuid),
                             progress_ratio=-1,
                             details=dict(self.error_handler.errors),
                         ),
@@ -405,6 +421,7 @@ class ModelOperator:
                 status=200,
                 message=ResponseMessage(
                     action="Success create model",
+                    task_uuid=str(self.uuid),
                     progress_ratio=1,
                     details={
                         "model": model,
@@ -434,6 +451,7 @@ class ModelOperator:
                 status=500,
                 message=ResponseMessage(
                     action="Unexpected failed to create model.",
+                    task_uuid=str(self.uuid),
                     progress_ratio=-1,
                     details=dict(self.error_handler.errors),
                 ),
