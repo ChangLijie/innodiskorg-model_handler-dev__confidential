@@ -5,6 +5,7 @@ import shutil
 from string import Template
 
 import httpx
+from fastapi import UploadFile
 from schema.main import ResponseFormat, ResponseMessage
 from tools.connect import get_model_server_url, get_models_folder
 from utils import ResponseErrorHandler, config_logger, get_uuid
@@ -12,6 +13,12 @@ from utils import ResponseErrorHandler, config_logger, get_uuid
 from .zip_handler import ZipOperator
 
 MODEL_STATUS = {}
+
+
+class CustomError(Exception):
+    def __init__(self, message, details=None):
+        super().__init__(message)
+        self.details = details
 
 
 class ModelOperator:
@@ -41,12 +48,12 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Start delete model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.5,
+                    progress=0.5,
                     details={"model_name": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
             shutil.rmtree(model_path)
 
             response = ResponseFormat(
@@ -54,12 +61,11 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Success delete model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=1,
+                    progress=1,
                     details={"model_name": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
 
             self.log.warning(f"'{self.uuid}'Delete model success.Details : {model}.")
 
@@ -77,14 +83,13 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Failed delete model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=-1,
-                    details=dict(self.error_handler.errors),
+                    progress=-1,
+                    details=dict(self.error_handler.errors[0]),
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
         finally:
-            await asyncio.sleep(0.1)
             del self.model_status[model]
             self.alive = False
 
@@ -101,14 +106,13 @@ class ModelOperator:
                         raise TypeError(
                             f"Unsupported message type: {type(raw_message)}"
                         )
-
+                    await asyncio.sleep(0.01)
                     yield message["status"], message["message"]
                 except (json.JSONDecodeError, KeyError, TypeError) as e:
                     self.log.error(
                         f"Failed to process message: {raw_message}, Error: {e}"
                     )
                     yield 500, {"error": "Invalid message format"}
-            await asyncio.sleep(0.1)
 
     async def get_model_list(self):
         try:
@@ -122,12 +126,11 @@ class ModelOperator:
                     message=ResponseMessage(
                         action="Get model.",
                         task_uuid=str(self.uuid),
-                        progress_ratio=(progress + 1) / total_model,
+                        progress=(progress + 1) / total_model,
                         details={"model": model},
                     ),
                 )
                 await self.message.put(json.dumps(dict(response)) + "\n")
-                await asyncio.sleep(0.1)
 
         except Exception as e:
             self.log.error(f"'{self.uuid}' Failed Get model list. Details: {e}")
@@ -143,45 +146,89 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Failed to get model list.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=-1,
-                    details=dict(self.error_handler.errors),
+                    progress=-1,
+                    details=dict(self.error_handler.errors[0]),
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
         finally:
-            await asyncio.sleep(0.1)
             self.alive = False
 
-    async def save_model(self, model: str, file: bytes):
+    async def save_model(
+        self,
+        model: str,
+        file: UploadFile,
+        progress_ratio: float = 1,
+        progress_base: float = 0,
+    ):
+        # async def save_model(self, model: str, file: UploadFile, content_length: int):
         try:
+            processed_size = 0
+
             self.model_status[model] = self.uuid
+
             operator = ZipOperator(filename=model)
-            operator.save_zip(file=file)
-            self.log.info(f"'{self.uuid}' Save '{model}' success.")
+            self.log.info(f"'{self.uuid}' Start to save '{model}'.")
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
                     action="Started save model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.25,
+                    progress=progress_ratio * 0 + progress_base,
+                    details={"model": model},
+                ),
+            )
+
+            processed_size = 0
+            chunk_size = 1024 * 1024
+            total = file.size
+            with open(operator.zip_path, "wb") as buffer:
+                file.file.seek(0)
+                while True:
+                    chunk = file.file.read(chunk_size)
+                    if not chunk:
+                        break
+                    buffer.write(chunk)
+                    processed_size = processed_size + chunk_size
+
+                    progress = round(0.5 * (processed_size / total), 2)
+                    response = ResponseFormat(
+                        status=200,
+                        message=ResponseMessage(
+                            action=f"Saving '{model}'.",
+                            task_uuid=str(self.uuid),
+                            progress=progress_ratio * progress + progress_base,
+                            details={"model": model},
+                        ),
+                    )
+                    await self.message.put(json.dumps(dict(response)) + "\n")
+
+                # with open(self.zip_path, "wb") as buffer:
+                #     buffer.write(file)
+
+            self.log.info(f"'{self.uuid}' Save '{model}' success.")
+            response = ResponseFormat(
+                status=200,
+                message=ResponseMessage(
+                    action=f"Save '{model}' success.",
+                    task_uuid=str(self.uuid),
+                    progress=progress_ratio * 0.5 + progress_base,
                     details={"model": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
 
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
                     action="Start extracted model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.5,
+                    progress=progress_ratio * 0.6 + progress_base,
                     details={"model": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
 
             operator.extract()
             self.log.info(f"'{self.uuid}' Upload '{model}' success.")
@@ -191,12 +238,12 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Success upload model file.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=1,
+                    progress=progress_ratio * 1 + progress_base,
                     details={"model": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
         except Exception as e:
             self.log.error(f"'{self.uuid}' Failed save model. Details: {e}")
             self.error_handler.add(
@@ -211,23 +258,29 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Failed to upload model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=-1,
-                    details=dict(self.error_handler.errors),
+                    progress=-1,
+                    details=dict(self.error_handler.errors[0]),
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
         finally:
-            await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
 
-    async def create_model(self, model: str, model_name_on_ollama: str):
+    async def create_model(
+        self,
+        model: str,
+        model_name_on_ollama: str,
+        progress_ratio: float = 1,
+        progress_base: float = 0,
+    ):
         try:
             self.model_status[model] = self.uuid
             model_server_url = get_model_server_url()
             url = model_server_url + "api/create"
             model_folder = os.path.join(self.root_path, model)
+            self.log.debug(f"'{self.uuid}' Started created model {model} ")
             ollama_model_folder = os.path.join(
                 "/home", model
             )  # Check if the model folder exists
@@ -236,48 +289,55 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Started to create model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.1,
+                    progress=progress_ratio * 0.1 + progress_base,
                     details={"model": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
 
             if not os.path.exists(model_folder):
                 self.log.warning(
                     f"'{self.uuid}' Create model error. Details : {model} not exist."
                 )
+
                 self.error_handler.add(
                     type=self.error_handler.ERR_INTERNAL,
                     loc=[self.error_handler.ERR_INTERNAL],
                     msg=f"'{self.uuid}' Create model error. Details : {model} not exist.",
                     input=dict(),
                 )
+                raise CustomError(
+                    message="Create model error.",
+                    details=self.error_handler.errors[0],
+                )
                 response = ResponseFormat(
                     status=500,
                     message=ResponseMessage(
                         action="Create model error.",
                         task_uuid=str(self.uuid),
-                        progress_ratio=-1,
+                        progress=-1,
                         details=dict(self.error_handler.errors),
                     ),
                 )
                 await self.message.put(json.dumps(dict(response)) + "\n")
-                await asyncio.sleep(0.1)
-
+                return
+            self.log.debug(f"'{self.uuid}'Start structure template ")
+            self.log.debug(
+                f"'{self.uuid}'Start structure template model_folder :{model_folder}"
+            )
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
                     action="Start structure template",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.2,
+                    progress=progress_ratio * 0.2 + progress_base,
                     details={"model": model},
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
 
             files = next(os.walk(model_folder))[2]
+
             modelfile_content = ""
             basemodel_template = Template("FROM $base_model_path")
             gguf_template = Template("\nADAPTER $gguf_path")
@@ -306,19 +366,21 @@ class ModelOperator:
                     msg=f"'{self.uuid}' Create model error. Details : File nums in {model} folder is illegal.",
                     input=dict(),
                 )
-
+                raise CustomError(
+                    message="Create model error.",
+                    details=self.error_handler.errors[0],
+                )
                 response = ResponseFormat(
                     status=500,
                     message=ResponseMessage(
                         action="Failed to structure template",
                         task_uuid=str(self.uuid),
-                        progress_ratio=-1,
+                        progress=-1,
                         details=dict(self.error_handler.errors),
                     ),
                 )
                 await self.message.put(json.dumps(dict(response)) + "\n")
-
-                await asyncio.sleep(0.1)
+                return
             # Prepare payload
             payload = {
                 "model": model_name_on_ollama,
@@ -332,7 +394,7 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Start to call model server",
                     task_uuid=str(self.uuid),
-                    progress_ratio=0.5,
+                    progress=progress_ratio * 0.5 + progress_base,
                     details={
                         "model": model,
                         "model_name_on_ollama": model_name_on_ollama,
@@ -340,7 +402,7 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
             # Make the POST request
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 try:
@@ -364,9 +426,10 @@ class ModelOperator:
                                     #     + "\n"
                                     # )
 
-                                    # await asyncio.sleep(0.1)
+                                    #
                                     # print(parsed_response)
                                 except json.JSONDecodeError as e:
+                                    raise
                                     self.log.error(
                                         f"'{self.uuid}' Create model Get response error .Details: JSON decode error . {e}"
                                     )
@@ -385,15 +448,16 @@ class ModelOperator:
                                         message=ResponseMessage(
                                             action="Model server processing failed.",
                                             task_uuid=str(self.uuid),
-                                            progress_ratio=-1,
+                                            progress=-1,
                                             details=dict(self.error_handler.errors),
                                         ),
                                     )
                                     await self.message.put(
                                         json.dumps(dict(response)) + "\n"
                                     )
-                                    await asyncio.sleep(0.1)
+                                    return
                 except httpx.RequestError as e:
+                    raise
                     self.log.error(
                         f"'{self.uuid}' Create model Request error.details: {e}"
                     )
@@ -410,19 +474,18 @@ class ModelOperator:
                         message=ResponseMessage(
                             action="Failed to call model server",
                             task_uuid=str(self.uuid),
-                            progress_ratio=-1,
+                            progress=-1,
                             details=dict(self.error_handler.errors),
                         ),
                     )
                     await self.message.put(json.dumps(dict(response)) + "\n")
-                    await asyncio.sleep(0.1)
-
+                    return
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
                     action="Success create model",
                     task_uuid=str(self.uuid),
-                    progress_ratio=1,
+                    progress=progress_ratio * 1 + progress_base,
                     details={
                         "model": model,
                         "model_name_on_ollama": model_name_on_ollama,
@@ -430,7 +493,7 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
             self.log.debug(f"'{self.uuid}' Success create model")
 
         except Exception as e:
@@ -452,13 +515,23 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Unexpected failed to create model.",
                     task_uuid=str(self.uuid),
-                    progress_ratio=-1,
-                    details=dict(self.error_handler.errors),
+                    progress=-1,
+                    details=dict(self.error_handler.errors[0]),
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            await asyncio.sleep(0.1)
+
         finally:
-            await asyncio.sleep(0.1)
             self.alive = False
             del self.model_status[model]
+
+    async def deploy(self, filename: str, model_name_on_ollama: str, file: UploadFile):
+        model = filename.replace(".zip", "")
+        await self.save_model(model=filename, file=file, progress_ratio=0.5)
+        self.alive = True
+        await self.create_model(
+            model=model,
+            model_name_on_ollama=model_name_on_ollama,
+            progress_ratio=0.5,
+            progress_base=0.5,
+        )
