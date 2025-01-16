@@ -16,7 +16,6 @@ class ZipOperator:
         self.error_handler = ResponseErrorHandler()
 
     def save_zip(self, file: bytes):
-        self.zip_path = Path(self.root_path) / self.filename
         try:
             with open(self.zip_path, "wb") as buffer:
                 buffer.write(file)
