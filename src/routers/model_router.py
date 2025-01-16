@@ -1,9 +1,9 @@
 import json
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
-from schema import CreateModel, DeleteModel, UploadModel
+from schema import CreateModel, DeleteModel
+from schema.main import DeployModel, UploadModel
 from tools.model_handler import MODEL_STATUS, ModelOperator
 from utils import ResponseErrorHandler, config_logger
 from utils.background_excutor import TaskExecutor
@@ -55,25 +55,20 @@ async def get_models(
 
 
 @router.post("/upload", tags=["Upload data"])
-async def upload(
-    model: Optional[UploadFile],
-):
+async def upload(model: UploadFile):
     request_body = UploadModel(model=model)
     error_handler = ResponseErrorHandler()
+    operator = ModelOperator()
     try:
-        operator = ModelOperator()
         filename = request_body.model.filename
-        file = await request_body.model.read()
+        file = request_body.model
+        print(filename)
+        task_executor.run_in_background(operator.save_model, model=filename, file=file)
 
-        task_executor.run_in_background(
-            operator.save_model,
-            model=filename,
-            file=file,
-        )
-
-        TASK_LOG.info(
-            f"Start upload model ({operator.uuid}): model : {filename.replace('.zip', '')}"
-        )
+        # TASK_LOG.info(
+        #     f"Start upload model ({operator.uuid}): model : {filename.replace('.zip', '')}"
+        # )
+        TASK_LOG.info(f"Start upload model ({operator.uuid}): ")
 
         async def event_generator():
             async for status_code, message in operator.get_status():
@@ -189,6 +184,50 @@ def create_model(
             type=error_handler.ERR_UNEXPECTED,
             loc=[error_handler.LOC_UNEXPECTED],
             msg=f"'{operator.uuid}' Create model error. Details : {e}",
+            input=dict(),
+        )
+        return Response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=json.dumps(error_handler.errors),
+            media_type="application/json",
+        )
+
+
+@router.post("/deploy", tags=["Deploy model"])
+async def deploy(model: UploadFile = Form(...), model_name_on_ollama: str = Form(...)):
+    request_body = DeployModel(model=model, model_name_on_ollama=model_name_on_ollama)
+    error_handler = ResponseErrorHandler()
+    operator = ModelOperator()
+    try:
+        filename = request_body.model.filename
+        file = request_body.model
+        model_name_on_ollama = request_body.model_name_on_ollama
+        task_executor.run_in_background(
+            operator.deploy,
+            filename=filename,
+            model_name_on_ollama=model_name_on_ollama,
+            file=file,
+        )
+
+        TASK_LOG.info(
+            f"Start Deploy model ({operator.uuid}): model : {filename} , model name on ollama : {model_name_on_ollama}"
+        )
+
+        async def event_generator():
+            async for status_code, message in operator.get_status():
+                yield json.dumps({"status": status_code, "message": message}) + "\n"
+
+        return StreamingResponse(
+            content=event_generator(),
+            media_type="application/json",
+        )
+
+    except Exception as e:
+        TASK_LOG.error(f"'{operator.uuid}' Deploy model error. Details :{e}")
+        error_handler.add(
+            type=error_handler.ERR_UNEXPECTED,
+            loc=[error_handler.LOC_UNEXPECTED],
+            msg=f"'{operator.uuid}' Deploy model error. Details :{e}",
             input=dict(),
         )
         return Response(
