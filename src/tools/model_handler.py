@@ -179,7 +179,18 @@ class ModelOperator:
                     details={"model": model},
                 ),
             )
-
+            for root, _, files in os.walk(operator.extract_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    _, ext = os.path.splitext(file)
+                    if ext.lower() != ".gguf":
+                        self.log.error(
+                            f"'{self.uuid}' Failed to save model. Details: Invalid file extension '{ext}' for file '{file_path}'."
+                        )
+                        shutil.rmtree(root)
+                        raise ValueError(
+                            f"Invalid file extension '{ext}' for file '{file_path}'."
+                        )
             processed_size = 0
             chunk_size = 1024 * 1024
             total = file.size
