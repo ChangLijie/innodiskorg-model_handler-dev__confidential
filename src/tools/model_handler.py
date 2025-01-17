@@ -285,6 +285,7 @@ class ModelOperator:
         finally:
             self.alive = False
             del self.model_status[model]
+            return True
 
     async def create_model(
         self,
