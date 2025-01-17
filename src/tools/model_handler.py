@@ -192,7 +192,11 @@ class ModelOperator:
                     buffer.write(chunk)
                     processed_size = processed_size + chunk_size
 
+                    if processed_size >= total:
+                        processed_size = total
+
                     progress = round(0.5 * (processed_size / total), 2)
+
                     response = ResponseFormat(
                         status=200,
                         message=ResponseMessage(
@@ -277,7 +281,7 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-
+            return False
         finally:
             self.alive = False
             del self.model_status[model]
@@ -541,11 +545,11 @@ class ModelOperator:
 
     async def deploy(self, filename: str, model_name_on_ollama: str, file: UploadFile):
         model = filename.replace(".zip", "")
-        await self.save_model(model=filename, file=file, progress_ratio=0.5)
-        self.alive = True
-        await self.create_model(
-            model=model,
-            model_name_on_ollama=model_name_on_ollama,
-            progress_ratio=0.5,
-            progress_base=0.5,
-        )
+        if await self.save_model(model=filename, file=file, progress_ratio=0.5):
+            self.alive = True
+            await self.create_model(
+                model=model,
+                model_name_on_ollama=model_name_on_ollama,
+                progress_ratio=0.5,
+                progress_base=0.5,
+            )
