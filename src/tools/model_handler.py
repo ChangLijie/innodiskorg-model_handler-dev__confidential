@@ -28,6 +28,7 @@ class ModelOperator:
         self.root_path = get_models_folder()
         self.message = asyncio.Queue()
         self.alive = True
+        self.error_flag = False
         self.model_status = MODEL_STATUS
         self.error_handler = ResponseErrorHandler()
         self.log = config_logger(
@@ -88,7 +89,7 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-
+            self.error_flag = True
         finally:
             del self.model_status[model]
             self.alive = False
@@ -107,7 +108,12 @@ class ModelOperator:
                             f"Unsupported message type: {type(raw_message)}"
                         )
                     await asyncio.sleep(0.01)
-                    yield message["status"], message["message"]
+
+                    # To solve extract stock in create model. we need to more i/o switch. use queue input output.
+                    if "Flag" in message["message"]["action"]:
+                        pass
+                    else:
+                        yield message["status"], message["message"]
                 except (json.JSONDecodeError, KeyError, TypeError) as e:
                     self.log.error(
                         f"Failed to process message: {raw_message}, Error: {e}"
@@ -126,7 +132,7 @@ class ModelOperator:
                     message=ResponseMessage(
                         action="Get model.",
                         task_uuid=str(self.uuid),
-                        progress=(progress + 1) / total_model,
+                        progress=round((progress + 1) / total_model, 2),
                         details={"model": model},
                     ),
                 )
@@ -151,7 +157,7 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-
+            self.error_flag = True
         finally:
             self.alive = False
 
@@ -173,12 +179,14 @@ class ModelOperator:
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
-                    action="Started save model.",
+                    action="Start save model.",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0 + progress_base,
+                    # progress=progress_ratio * 0.33 + progress_base,
+                    progress=0,
                     details={"model": model},
                 ),
             )
+            await self.message.put(json.dumps(dict(response)) + "\n")
 
             processed_size = 0
             chunk_size = 1024 * 1024
@@ -200,9 +208,11 @@ class ModelOperator:
                     response = ResponseFormat(
                         status=200,
                         message=ResponseMessage(
-                            action=f"Saving '{model}'.",
+                            action=f"Flag Saving '{model}'.",
                             task_uuid=str(self.uuid),
-                            progress=progress_ratio * progress + progress_base,
+                            progress=round(
+                                progress_ratio * progress + progress_base, 2
+                            ),
                             details={"model": model},
                         ),
                     )
@@ -212,23 +222,23 @@ class ModelOperator:
                 #     buffer.write(file)
 
             self.log.info(f"'{self.uuid}' Save '{model}' success.")
+            # response = ResponseFormat(
+            #     status=200,
+            #     message=ResponseMessage(
+            #         action=f"Save '{model}' success.",
+            #         task_uuid=str(self.uuid),
+            #         progress=progress_ratio * 0.5 + progress_base,
+            #         details={"model": model},
+            #     ),
+            # )
+            # await self.message.put(json.dumps(dict(response)) + "\n")
+            self.log.info(f"'{self.uuid}' Start extract '{model}'.")
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
-                    action=f"Save '{model}' success.",
+                    action="Start extract model.",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0.5 + progress_base,
-                    details={"model": model},
-                ),
-            )
-            await self.message.put(json.dumps(dict(response)) + "\n")
-
-            response = ResponseFormat(
-                status=200,
-                message=ResponseMessage(
-                    action="Start extracted model.",
-                    task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0.6 + progress_base,
+                    progress=round(progress_ratio * 0.66 + progress_base, 2),
                     details={"model": model},
                 ),
             )
@@ -256,7 +266,7 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Success upload model file.",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 1 + progress_base,
+                    progress=round(progress_ratio * 1 + progress_base, 2),
                     details={"model": model},
                 ),
             )
@@ -281,11 +291,10 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-            return False
+            self.error_flag = True
         finally:
             self.alive = False
             del self.model_status[model]
-            return True
 
     async def create_model(
         self,
@@ -299,16 +308,16 @@ class ModelOperator:
             model_server_url = get_model_server_url()
             url = model_server_url + "api/create"
             model_folder = os.path.join(self.root_path, model)
-            self.log.debug(f"'{self.uuid}' Started created model {model} ")
+            self.log.info(f"'{self.uuid}' Start create model {model} ")
             ollama_model_folder = os.path.join(
                 "/home", model
             )  # Check if the model folder exists
             response = ResponseFormat(
                 status=200,
                 message=ResponseMessage(
-                    action="Started to create model.",
+                    action="Start create model.",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0.1 + progress_base,
+                    progress=round(progress_ratio * 0.33 + progress_base, 2),
                     details={"model": model},
                 ),
             )
@@ -340,8 +349,7 @@ class ModelOperator:
                 )
                 await self.message.put(json.dumps(dict(response)) + "\n")
                 return
-            self.log.debug(f"'{self.uuid}'Start structure template ")
-            self.log.debug(
+            self.log.info(
                 f"'{self.uuid}'Start structure template model_folder :{model_folder}"
             )
             response = ResponseFormat(
@@ -349,7 +357,7 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Start structure template",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0.2 + progress_base,
+                    progress=round(progress_ratio * 0.66 + progress_base, 2),
                     details={"model": model},
                 ),
             )
@@ -408,19 +416,19 @@ class ModelOperator:
             self.log.debug(
                 f"'{self.uuid}' Start created model to ollama. payload: {payload}"
             )
-            response = ResponseFormat(
-                status=200,
-                message=ResponseMessage(
-                    action="Start to call model server",
-                    task_uuid=str(self.uuid),
-                    progress=progress_ratio * 0.5 + progress_base,
-                    details={
-                        "model": model,
-                        "model_name_on_ollama": model_name_on_ollama,
-                    },
-                ),
-            )
-            await self.message.put(json.dumps(dict(response)) + "\n")
+            # response = ResponseFormat(
+            #     status=200,
+            #     message=ResponseMessage(
+            #         action="Start to call model server",
+            #         task_uuid=str(self.uuid),
+            #         progress=progress_ratio * 0.5 + progress_base,
+            #         details={
+            #             "model": model,
+            #             "model_name_on_ollama": model_name_on_ollama,
+            #         },
+            #     ),
+            # )
+            # await self.message.put(json.dumps(dict(response)) + "\n")
 
             # Make the POST request
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -504,7 +512,7 @@ class ModelOperator:
                 message=ResponseMessage(
                     action="Success create model",
                     task_uuid=str(self.uuid),
-                    progress=progress_ratio * 1 + progress_base,
+                    progress=round(progress_ratio * 1 + progress_base, 2),
                     details={
                         "model": model,
                         "model_name_on_ollama": model_name_on_ollama,
@@ -539,14 +547,15 @@ class ModelOperator:
                 ),
             )
             await self.message.put(json.dumps(dict(response)) + "\n")
-
+            self.error_flag = True
         finally:
             self.alive = False
             del self.model_status[model]
 
     async def deploy(self, filename: str, model_name_on_ollama: str, file: UploadFile):
         model = filename.replace(".zip", "")
-        if await self.save_model(model=filename, file=file, progress_ratio=0.5):
+        await self.save_model(model=filename, file=file, progress_ratio=0.5)
+        if not self.error_flag:
             self.alive = True
             await self.create_model(
                 model=model,
