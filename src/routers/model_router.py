@@ -2,6 +2,7 @@ import json
 
 from fastapi import APIRouter, Depends, Form, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
+
 from schema import CreateModel, DeleteModel
 from schema.main import DeployModel, UploadModel
 from tools.model_handler import MODEL_STATUS, ModelOperator
@@ -20,7 +21,7 @@ TASK_LOG = config_logger(
 task_executor = TaskExecutor(max_workers=10)
 
 
-@router.get("/model", tags=["Get models list"])
+@router.get("/model/", tags=["Get models list"])
 async def get_models(
     # stream: bool = Query(default=True, description="Enable streaming response"),
 ):
@@ -54,7 +55,7 @@ async def get_models(
         )
 
 
-@router.post("/upload", tags=["Upload data"])
+@router.post("/upload/", tags=["Upload data"])
 async def upload(model: UploadFile):
     request_body = UploadModel(model=model)
     error_handler = ResponseErrorHandler()
@@ -94,7 +95,7 @@ async def upload(model: UploadFile):
         )
 
 
-@router.delete("/model", tags=["Delete Innodisk Model."])
+@router.delete("/model/", tags=["Delete Innodisk Model."])
 def delete_model(
     request: DeleteModel = Depends(),
 ):
@@ -149,7 +150,7 @@ def delete_model(
         )
 
 
-@router.post("/model/create", tags=["Create Model on Ollama"])
+@router.post("/model/create/", tags=["Create Model on Ollama"])
 def create_model(
     request: CreateModel,
 ):
@@ -193,7 +194,7 @@ def create_model(
         )
 
 
-@router.post("/deploy", tags=["Deploy model"])
+@router.post("/deploy/", tags=["Deploy model"])
 async def deploy(model: UploadFile = Form(...), model_name_on_ollama: str = Form(...)):
     request_body = DeployModel(model=model, model_name_on_ollama=model_name_on_ollama)
     error_handler = ResponseErrorHandler()
