@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main  # Trigger when the main branch is updated
-
+  
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
