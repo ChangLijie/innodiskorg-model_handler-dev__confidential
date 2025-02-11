@@ -13,10 +13,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install jq (if not installed)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Read version from docs/version.json
         id: get_version
         run: |
-          VERSION=$(jq -r .version docs/version.json)
+          VERSION=$(jq -r '.version' docs/version.json)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Display version
