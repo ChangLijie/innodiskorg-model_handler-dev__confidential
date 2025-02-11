@@ -17,11 +17,11 @@ def build_argparser():
     )
 
     args.add_argument(
-        "-url",
-        "--url",
+        "-ip",
+        "--ip",
         default="127.0.0.1",
         type=str,
-        help="The URL of the WebSocket server. Default: 127.0.0.1",
+        help="The ip of the WebSocket server. Default: 127.0.0.1",
     )
 
     args.add_argument(
@@ -50,10 +50,10 @@ def build_argparser():
     return parser
 
 
-async def websocket_client(uri, client_id):
+async def websocket_client(url, client_id):
     try:
-        async with websockets.connect(uri) as websocket:
-            print(f"Client {client_id} connected to {uri}")
+        async with websockets.connect(url) as websocket:
+            print(f"Client {client_id} connected to {url}")
 
             await websocket.send(f"Hello from client {client_id}")
             print(f"Client {client_id} sent: Hello from client {client_id}")
@@ -66,27 +66,27 @@ async def websocket_client(uri, client_id):
         print(f"Client {client_id} error: {e}")
 
 
-async def main(uuid: str, n_user: int = 1, url: str = "127.0.0.1", port: str = 5000):
-    uri = f"ws://{url}:{port}/ws/{uuid}"
+async def main(uuid: str, n_user: int = 1, ip: str = "127.0.0.1", port: str = 5000):
+    url = f"ws://{ip}:{port}/ws/{uuid}"
     num_clients = n_user
 
     tasks = [
-        websocket_client(uri, client_id) for client_id in range(1, num_clients + 1)
+        websocket_client(url, client_id) for client_id in range(1, num_clients + 1)
     ]
     await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
     args = build_argparser().parse_args()
-    url = args.url
+    ip = args.ip
     port = args.port
     uuid = args.uuid
     n_user = args.n_user
     print(
         f"""The parameter you set is like below:\n \
-    * url : {url} \n \
+    * ip : {ip} \n \
     * port : {port} \n \
     * uuid : {uuid} \n \
     * n_user : {n_user} \n \n \n """
     )
-    asyncio.run(main(uuid=uuid, url=url, port=port, n_user=n_user))
+    asyncio.run(main(uuid=uuid, ip=ip, port=port, n_user=n_user))

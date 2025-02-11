@@ -16,12 +16,18 @@ LOG_LEVEL = {
 
 
 # ===============================================================================================
-def config_logger(log_name=None, write_mode="a", level="Debug", clear_log=False):
-    write_mode = "a"
-    logger = logging.getLogger()  # get logger
-    logger.setLevel(LOG_LEVEL[level])  # set level
+def config_logger(
+    file_name=None,
+    write_mode="a",
+    level="Debug",
+    clear_log=False,
+    logger_name=None,
+    sub_folder=None,
+):
+    logger = logging.getLogger(logger_name) if logger_name else logging.getLogger()
+    logger.setLevel(LOG_LEVEL[level.lower()])
 
-    if not logger.hasHandlers():  # if the logger is not setup
+    if not logger.hasHandlers():  # 如果尚未設置處理器
         basic_formatter = logging.Formatter(
             "%(asctime)s [%(levelname)s] %(message)s (%(filename)s:%(lineno)s)",
             "%y-%m-%d %H:%M:%S",
@@ -31,43 +37,40 @@ def config_logger(log_name=None, write_mode="a", level="Debug", clear_log=False)
             "%y-%m-%d %H:%M:%S",
         )
 
-        # add stream handler
+        # 添加流處理器
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         stream_handler.setLevel(LOG_LEVEL[level.lower()])
         logger.addHandler(stream_handler)
+
+        # 創建日志目錄
         create_day = datetime.now().strftime("%y-%m-%d")
         log_root_path = os.path.join(DEFAULT_FOLDER, create_day)
+
+        if sub_folder:  # 如果指定了子目錄
+            log_root_path = os.path.join(log_root_path, sub_folder)
+
         if not os.path.isdir(log_root_path):
             os.makedirs(log_root_path)
 
-        # add file handler
+        # 添加文件處理器
+        if file_name:
+            file_name = os.path.join(log_root_path, file_name)
+            if clear_log and os.path.exists(file_name):
+                logging.warning("Clearing existing log file")
+                os.remove(file_name)
 
-        if log_name:
-            # Naming Log file
-            if clear_log and os.path.exists(log_name):
-                logging.warning("Clearing exist log files")
-                os.remove(log_name)
-            log_name = os.path.join(log_root_path, log_name)
-            # log_name = f"{os.path.splitext(log_name)[0]}-{create_day}.log"
-            # file_handler = TimedRotatingFileHandler()
             file_handler = RotatingFileHandler(
-                filename=log_name,
+                filename=file_name,
                 mode=write_mode,
-                maxBytes=5 * 1024 * 1024,
+                maxBytes=5 * 1024 * 1024,  # 5MB
                 backupCount=2,
                 encoding="utf-8",
             )
             file_handler.setFormatter(basic_formatter)
-            file_handler.setLevel(LOG_LEVEL["info"])
+            file_handler.setLevel(LOG_LEVEL[level.lower()])
             logger.addHandler(file_handler)
 
-    # logger.info("Create logger.({})".format(logger.name))
-    # logger.info(
-    #     "Enabled stream {}".format(
-    #         f"and file mode.({log_name})" if log_name else "mode"
-    #     )
-    # )
     return logger
 
 
@@ -75,8 +78,9 @@ def config_logger(log_name=None, write_mode="a", level="Debug", clear_log=False)
 if __name__ == "__main__":
     import test
 
-    config_logger(log_name="ivit-t.log", write_mode="w", level="debug")
-
-    logging.info("start")
+    logger = config_logger(
+        file_name="ivit-t.log", write_mode="w", level="debug", logger_name="test_logger"
+    )
+    logger.info("start")
 
     test.start()
