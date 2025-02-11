@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main  # Only trigger when the main branch is updated
+      - main  # Trigger when the main branch is updated
 
 jobs:
   build-and-push:
@@ -19,11 +19,11 @@ jobs:
       - name: Read version from docs/version.json
         id: get_version
         run: |
-          VERSION=$(jq -r '.version' ./docs/version.json)
+          VERSION=$(jq -r '.version' docs/version.json)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Display version
-        run: echo "Version: ${{ env.VERSION }}"
+        run: echo "Version:$VERSION"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -33,10 +33,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t innodiskorg/open-webui:${{ env.VERSION }} .
-          docker tag innodiskorg/open-webui:${{ env.VERSION }} innodiskorg/open-webui:latest
+          docker build -t innodiskorg/open-webui:$VERSION .
+          docker tag innodiskorg/open-webui:$VERSION innodiskorg/open-webui:latest
 
       - name: Push Docker image to Docker Hub
         run: |
-          docker push innodiskorg/open-webui:${{ env.VERSION }}
+          docker push innodiskorg/open-webui:$VERSION
           docker push innodiskorg/open-webui:latest
