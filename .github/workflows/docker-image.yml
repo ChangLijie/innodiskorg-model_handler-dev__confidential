@@ -33,10 +33,10 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t innodiskorg/open-webui:$VERSION .
-          docker tag innodiskorg/open-webui:$VERSION innodiskorg/open-webui:latest
+          docker build -t innodiskorg/model_handler:$VERSION .
+          docker tag innodiskorg/model_handler:$VERSION innodiskorg/model_handler:latest
 
       - name: Push Docker image to Docker Hub
         run: |
-          docker push innodiskorg/open-webui:$VERSION
-          docker push innodiskorg/open-webui:latest
+          docker push innodiskorg/model_handler:$VERSION
+          docker push innodiskorg/model_handler:latest
