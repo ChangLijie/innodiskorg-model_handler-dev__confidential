@@ -2,8 +2,9 @@ changelog:
   exclude:
     authors:
       - 'dependabot'  # 過濾機器人 PR
-    labels:
-      - 'skip-changelog'
+    files:
+      - '.github/workflows/**'  # ✅ 也排除 GitHub Actions 變更
+      - '.github/changelog.yml'
   categories:
     - title: '🚀 New Features'
       labels:

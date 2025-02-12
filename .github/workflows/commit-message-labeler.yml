@@ -29,9 +29,6 @@ jobs:
           elif [[ "${{ env.COMMIT_MSG }}" =~ ^docs: ]]; then
             echo "Detected documentation update, adding label."
             gh issue create --title "Docs update detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: docs"
-          elif [[ "${{ env.COMMIT_MSG }}" =~ ^skip: ]]; then
-            echo "Detected skip commit, adding skip-changelog label."
-            gh issue create --title "Skip commit detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "skip-changelog"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
