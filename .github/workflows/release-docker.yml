@@ -58,12 +58,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Create GitHub Release (Auto-generate PR-based changelog)
+      - name: Generate Release Notes from Commit Messages
+        id: release_notes
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [[ -z "$LAST_TAG" ]]; then
+            CHANGELOG=$(git log --pretty=format:"- %h %s (%an)" --reverse)
+          else
+            CHANGELOG=$(git log $LAST_TAG..HEAD --pretty=format:"- %h %s (%an)" --reverse)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
-          generate_release_notes: true
-          changelog_configuration: .github/changelog.yml
+          body: |
+            ## 🔥 Changelog
+            ${{ env.CHANGELOG }}
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
