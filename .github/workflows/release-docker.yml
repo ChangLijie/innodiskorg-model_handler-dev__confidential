@@ -58,17 +58,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Generate Release Notes from Commit Messages
+      - name: Generate Categorized Release Notes
         id: release_notes
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          # 取得從上一次 Release 以來的 Commit
           if [[ -z "$LAST_TAG" ]]; then
-            CHANGELOG=$(git log --pretty=format:"- %h %s (%an)" --reverse)
+            COMMITS=$(git log --pretty=format:"%s")
           else
-            CHANGELOG=$(git log $LAST_TAG..HEAD --pretty=format:"- %h %s (%an)" --reverse)
+            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
           fi
-          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG" >> $GITHUB_ENV
+
+          # 初始化分類
+          FEATURES=""
+          FIXES=""
+          DOCS=""
+          REFACTOR=""
+
+          # 逐行讀取 Commit Message 並分類
+          while IFS= read -r line; do
+            if [[ $line =~ ^feat: ]]; then
+              FEATURES+="- ${line:5}\n"
+            elif [[ $line =~ ^fix: ]]; then
+              FIXES+="- ${line:4}\n"
+            elif [[ $line =~ ^docs: ]]; then
+              DOCS+="- ${line:5}\n"
+            elif [[ $line =~ ^refactor: ]]; then
+              REFACTOR+="- ${line:9}\n"
+            fi
+          done <<< "$COMMITS"
+
+          # 生成 Release Notes
+          RELEASE_NOTES=""
+          if [[ ! -z "$FEATURES" ]]; then
+            RELEASE_NOTES+="## ✨ Features\n$FEATURES\n"
+          fi
+          if [[ ! -z "$FIXES" ]]; then
+            RELEASE_NOTES+="## 🐛 Bug Fixes\n$FIXES\n"
+          fi
+          if [[ ! -z "$DOCS" ]]; then
+            RELEASE_NOTES+="## 📝 Documentation\n$DOCS\n"
+          fi
+          if [[ ! -z "$REFACTOR" ]]; then
+            RELEASE_NOTES+="## 🔨 Refactoring\n$REFACTOR\n"
+          fi
+
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          echo -e "$RELEASE_NOTES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Create GitHub Release
@@ -76,9 +113,6 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           name: Release ${{ env.VERSION }}
-          body: |
-            ## 🔥 Changelog
-            ${{ env.CHANGELOG }}
-          generate_release_notes: false
+          body: ${{ env.RELEASE_NOTES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
