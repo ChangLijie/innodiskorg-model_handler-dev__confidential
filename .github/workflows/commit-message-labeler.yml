@@ -15,20 +15,26 @@ jobs:
       - name: Read last commit message
         id: get_commit
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+          echo "COMMIT_MSG<<EOF" >> $GITHUB_ENV
+          git log -1 --pretty=%B >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Determine labels based on commit message
         run: |
-          if [[ "${{ env.COMMIT_MSG }}" =~ ^feat: ]]; then
+          COMMIT_MSG=$(echo "${{ env.COMMIT_MSG }}" | tr -d '\n' | tr -d '\r')  # 確保無換行
+          
+          if [[ "$COMMIT_MSG" =~ ^feat: ]]; then
             echo "Detected feature commit, adding label."
-            gh issue create --title "Feature commit detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: feature"
-          elif [[ "${{ env.COMMIT_MSG }}" =~ ^fix: ]]; then
+            gh issue create --title "Feature commit detected" --body "Commit message: $COMMIT_MSG" --label "type: feature"
+          elif [[ "$COMMIT_MSG" =~ ^fix: ]]; then
             echo "Detected bug fix, adding label."
-            gh issue create --title "Bug fix detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: bug(fix)"
-          elif [[ "${{ env.COMMIT_MSG }}" =~ ^docs: ]]; then
+            gh issue create --title "Bug fix detected" --body "Commit message: $COMMIT_MSG" --label "type: bug(fix)"
+          elif [[ "$COMMIT_MSG" =~ ^docs: ]]; then
             echo "Detected documentation update, adding label."
-            gh issue create --title "Docs update detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: docs"
+            gh issue create --title "Docs update detected" --body "Commit message: $COMMIT_MSG" --label "type: docs"
+          elif [[ "$COMMIT_MSG" =~ ^skip: ]]; then
+            echo "Detected skip commit, adding skip-changelog label."
+            gh issue create --title "Skip commit detected" --body "Commit message: $COMMIT_MSG" --label "skip-changelog"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
