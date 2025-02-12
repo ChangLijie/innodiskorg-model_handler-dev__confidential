@@ -1,0 +1,26 @@
+name: Commit Message Labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels based on commit message
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: |
+            feat: type: feature
+            fix: type: bug(fix)
+            docs: type: docs
+            refactor: type: refactor
+            skip: skip-changelog
+          label_patterns: |
+            ^feat:[^\s].*  type: feature
+            ^fix:[^\s].*  type: bug(fix)
+            ^docs:[^\s].*  type: docs
+            ^refactor:[^\s].*  type: refactor
+            ^skip:[^\s].*  skip-changelog  

@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    authors:
+      - 'dependabot'  # 過濾機器人 PR
+    labels:
+      - 'skip-changelog'
+  categories:
+    - title: '🚀 New Features'
+      labels:
+        - 'type: feature'
+
+    - title: '🐛 Bug Fixes'
+      labels:
+        - 'type: bug(fix)'
+
+    - title: '📖 Documentation'
+      labels:
+        - 'type: docs'
+
+    - title: '🔨 Refactor'
+      labels:
+        - 'type: refactor'
+
+    - title: '🛠 Other Changes'
+      labels:
+        - '*'
