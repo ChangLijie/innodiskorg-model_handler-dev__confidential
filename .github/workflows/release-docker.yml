@@ -6,6 +6,11 @@ on:
       - main  # Trigger only when changes are pushed to `main`
   workflow_dispatch:  # Allow manual execution
 
+permissions:
+  contents: write  # ✅ 允許推送 Release、寫入 Repository
+  issues: write    # ✅ 允許管理 Issues
+  pull-requests: write  # ✅ 允許管理 PR
+  
 jobs:
   read-version:
     runs-on: ubuntu-latest
