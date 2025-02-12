@@ -1,29 +1,37 @@
-name: Commit Message Labeler
+name: Commit Message Labeler (for push)
 
 on:
-  push:  # ✅ 讓 GitHub 直接讀取 Commit 而不需要 PR
+  push:
     branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, closed]
+      - main  # ✅ 讓 Push 也能標籤
 
 jobs:
-  label:
+  label-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Apply labels based on commit message
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: |
-            feat: type: feature
-            fix: type: bug(fix)
-            docs: type: docs
-            refactor: type: refactor
-            skip: skip-changelog
-          label_patterns: |
-            ^feat:[^\s].*  type: feature
-            ^fix:[^\s].*  type: bug(fix)
-            ^docs:[^\s].*  type: docs
-            ^refactor:[^\s].*  type: refactor
-            ^skip:[^\s].*  skip-changelog  
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Read last commit message
+        id: get_commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "COMMIT_MSG=$COMMIT_MSG" >> $GITHUB_ENV
+
+      - name: Determine labels based on commit message
+        run: |
+          if [[ "${{ env.COMMIT_MSG }}" =~ ^feat: ]]; then
+            echo "Detected feature commit, adding label."
+            gh issue create --title "Feature commit detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: feature"
+          elif [[ "${{ env.COMMIT_MSG }}" =~ ^fix: ]]; then
+            echo "Detected bug fix, adding label."
+            gh issue create --title "Bug fix detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: bug(fix)"
+          elif [[ "${{ env.COMMIT_MSG }}" =~ ^docs: ]]; then
+            echo "Detected documentation update, adding label."
+            gh issue create --title "Docs update detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "type: docs"
+          elif [[ "${{ env.COMMIT_MSG }}" =~ ^skip: ]]; then
+            echo "Detected skip commit, adding skip-changelog label."
+            gh issue create --title "Skip commit detected" --body "Commit message: ${{ env.COMMIT_MSG }}" --label "skip-changelog"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
