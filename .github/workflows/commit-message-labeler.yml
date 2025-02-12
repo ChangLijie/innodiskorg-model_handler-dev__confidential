@@ -1,8 +1,11 @@
 name: Commit Message Labeler
 
 on:
+  push:  # ✅ 讓 GitHub 直接讀取 Commit 而不需要 PR
+    branches:
+      - main
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, closed]
 
 jobs:
   label:
