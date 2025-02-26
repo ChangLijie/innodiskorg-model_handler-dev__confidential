@@ -18,13 +18,13 @@ TASK_LOG = config_logger(
     level="info",
     logger_name="model_router_logger",
 )
-task_executor = TaskExecutor(max_workers=10)
 
 
 @router.get("/model/", tags=["Get models list"])
 async def get_models(
     # stream: bool = Query(default=True, description="Enable streaming response"),
 ):
+    task_executor = TaskExecutor(max_workers=10)
     error_handler = ResponseErrorHandler()
     try:
         operator = ModelOperator()
@@ -57,6 +57,7 @@ async def get_models(
 
 @router.post("/upload/", tags=["Upload data"])
 async def upload(model: UploadFile):
+    task_executor = TaskExecutor(max_workers=10)
     request_body = UploadModel(model=model)
     error_handler = ResponseErrorHandler()
     operator = ModelOperator()
@@ -99,6 +100,7 @@ async def upload(model: UploadFile):
 def delete_model(
     request: DeleteModel = Depends(),
 ):
+    task_executor = TaskExecutor(max_workers=10)
     error_handler = ResponseErrorHandler()
     try:
         model = request.model
@@ -154,6 +156,7 @@ def delete_model(
 def create_model(
     request: CreateModel,
 ):
+    task_executor = TaskExecutor(max_workers=10)
     error_handler = ResponseErrorHandler()
     try:
         model = request.model
@@ -196,6 +199,7 @@ def create_model(
 
 @router.post("/deploy/", tags=["Deploy model"])
 async def deploy(model: UploadFile = Form(...), model_name_on_ollama: str = Form(...)):
+    task_executor = TaskExecutor(max_workers=10)
     request_body = DeployModel(model=model, model_name_on_ollama=model_name_on_ollama)
     error_handler = ResponseErrorHandler()
     operator = ModelOperator()
@@ -203,6 +207,21 @@ async def deploy(model: UploadFile = Form(...), model_name_on_ollama: str = Form
         filename = request_body.model.filename
         file = request_body.model
         model_name_on_ollama = request_body.model_name_on_ollama
+
+        if filename in MODEL_STATUS:
+            error_handler.add(
+                type=error_handler.ERR_INTERNAL,
+                loc=[error_handler.ERR_INTERNAL],
+                msg=f"{filename} is being processed.",
+                input={},
+            )
+            TASK_LOG.info(f"{filename} is being processed.")
+            return Response(
+                status_code=status.HTTP_409_CONFLICT,
+                content=json.dumps(error_handler.errors),
+                media_type="application/json",
+            )
+
         task_executor.run_in_background(
             operator.deploy,
             filename=filename,
