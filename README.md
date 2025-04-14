@@ -43,7 +43,7 @@ Run Docker:
       -e MODEL_SERVER_IP=${Ollama IP} \
       -e MODEL_SERVER_PORT=${Ollama Port} \
       --name test_model_handler \
-      innodiskorg/model_handler:v0.0.2
+      innodiskorg/model_handler:latest
    ```
    **Notes:**
    - **model folder path**: The directory path where your models will be stored. *(The models folder you created earlier, which contains the inno and ollama subdirectories.)*
