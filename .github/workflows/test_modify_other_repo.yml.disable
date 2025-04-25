@@ -62,7 +62,7 @@ jobs:
 
             # Patch +1
             NEW_PATCH_VERSION=$((PATCH_VERSION + 1))
-            NEW_VERSION="v${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH_VERSION}"
+            NEW_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${NEW_PATCH_VERSION}"
 
             echo "🔁 New patch version: $NEW_VERSION"
 
