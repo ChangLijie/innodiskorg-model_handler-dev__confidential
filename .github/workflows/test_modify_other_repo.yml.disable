@@ -1,90 +1,29 @@
-name: Build release
+name: Test Change AccelBrain
+
 on:
   workflow_dispatch:
 
 jobs:
-  release:
+  test-update:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-  
-      - name: Check for changes in version.json
+
+      - name: Check for changes in package.json
         run: |
-          git diff --cached --diff-filter=d docs/version.json || {
-            echo "No changes to version.json"
+          git diff --cached --diff-filter=d package.json || {
+            echo "No changes to package.json"
             exit 1
           }
-
-      - name: Get version number from version.json
+      - name: Get version number from package.json
         id: get_version
         run: |
-          VERSION=$(jq -r '.version' docs/version.json)
+          VERSION=$(jq -r '.version' package.json)
           echo "::set-output name=version::$VERSION"
 
-      - name: Extract latest CHANGELOG entry
-        id: changelog
-        run: |
-          CHANGELOG_CONTENT=$(awk 'BEGIN {print_section=0;} /^## \[/ {if (print_section == 0) {print_section=1;} else {exit;}} print_section {print;}' CHANGELOG.md)
-          CHANGELOG_ESCAPED=$(echo "$CHANGELOG_CONTENT" | sed ':a;N;$!ba;s/\n/%0A/g')
-          echo "Extracted latest release notes from CHANGELOG.md:" 
-          echo -e "$CHANGELOG_CONTENT"
-          echo "::set-output name=content::$CHANGELOG_ESCAPED"
-
-      - name: Create GitHub release
-        id: create_release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const changelog = `${{ steps.changelog.outputs.content }}`;
-            const release = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: `v${{ steps.get_version.outputs.version }}`,
-              name: `v${{ steps.get_version.outputs.version }}`,
-              body: changelog,
-            });
-            console.log(`Created release ${release.data.html_url}`);
-
-      - name: Upload package to GitHub release
-        uses: actions/upload-artifact@v4
-        with:
-          name: package
-          path: |
-            .
-            !.git
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Trigger and wait for Docker build workflow
-        id: trigger_and_wait
-        uses: convictional/trigger-workflow-and-wait@v1.6.4
-        with:
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.event.repository.name }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow_file_name: docker-build.yaml
-          ref: v${{ steps.get_version.outputs.version }}
-          client_payload: '{}'
-          wait_interval: 10
-          timeout_seconds: 3600
-
-      - name: Print Docker build workflow result
-        if: always()
-        run: |
-          if [ "${{ steps.trigger_and_wait.outputs.conclusion }}" = "success" ]; then
-            echo -e "\033[32m✅ Workflow Success!\033[0m"
-          else
-            echo -e "\033[31m❌ Workflow Failed!\033[0m"
-          fi
-          echo "Workflow conclusion: ${{ steps.trigger_and_wait.outputs.conclusion }}"
-          echo "Workflow run ID: ${{ steps.trigger_and_wait.outputs.id }}"
-          echo "Workflow URL: ${{ steps.trigger_and_wait.outputs.html_url }}"
-
       - name: Checkout AccelBrain-dev__confidential repository
-        if: steps.trigger_and_wait.outputs.conclusion == 'success'
         uses: actions/checkout@v4
         with:
           repository: ChangLijie/AccelBrain-dev__confidential
@@ -93,23 +32,20 @@ jobs:
           path: accelbrain-confidential
 
       - name: Get latest release tag from accelbrain-confidential repo
-        if: steps.trigger_and_wait.outputs.conclusion == 'success'
         id: get_release
         run: |
-          cd accelbrain-confidential || (echo "Directory not found" && exit 1)
+          cd accelbrain-confidential
           git fetch --tags
           TAG=$(git tag --sort=-v:refname | head -n 1)
           echo "release_tag=$TAG" >> $GITHUB_OUTPUT
           echo "release_tag=$TAG"
 
-      - name: Update docker-compose.yml image tag
-        if: steps.trigger_and_wait.outputs.conclusion == 'success'
-        run: |
-          cd accelbrain-confidential || (echo "Directory not found" && exit 1)
-          sed -i "s|innodiskorg/model_handler:.*|innodiskorg/model_handler:v${{ steps.get_version.outputs.version }}|g" docker-compose.yml
+      # - name: Update docker-compose.yml image tag
+      #   run: |
+      #     cd accelbrain-confidential || (echo "Directory not found" && exit 1)
+      #     sed -i "s|innodiskorg/open-webui:.*|innodiskorg/open-webui:v${{ steps.get_version.outputs.version }}|g" docker-compose.yml
 
       - name: Update CHANGELOG.md
-        if: steps.trigger_and_wait.outputs.conclusion == 'success'
         run: |
           cd accelbrain-confidential || (echo "Directory not found" && exit 1)
           echo "Reading current version from CHANGELOG.md"
@@ -192,9 +128,10 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push changes
-        if: steps.trigger_and_wait.outputs.conclusion == 'success'
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: bump model_handler image to v${{ steps.get_version.outputs.version }}"
-          repository: ./accelbrain-confidential
+      
+
+      # - name: Commit and push changes
+      #   uses: stefanzweifel/git-auto-commit-action@v5
+      #   with:
+      #     commit_message: "chore: bump open-webui image to v${{ steps.get_version.outputs.version }}"
+      #     repository: ./accelbrain-confidential
